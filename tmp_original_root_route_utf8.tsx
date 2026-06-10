@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -77,9 +77,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SnapCut AI — Remove backgrounds in one click" },
+      { title: "SnapCut AI ΓÇö Remove backgrounds in one click" },
       { name: "description", content: "AI-powered background removal. Drop an image, get a transparent PNG in seconds. Built for creators, sellers, and teams." },
-      { property: "og:title", content: "SnapCut AI — Remove backgrounds in one click" },
+      { property: "og:title", content: "SnapCut AI ΓÇö Remove backgrounds in one click" },
       { property: "og:description", content: "AI-powered background removal in seconds." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
