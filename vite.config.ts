@@ -12,4 +12,13 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Force Nitro output for Vercel builds so Vercel can deploy the SSR server correctly.
+  nitro: {
+    preset: "vercel",
+    output: {
+      dir: ".vercel/output",
+      publicDir: ".vercel/output/public",
+      serverDir: ".vercel/output/server",
+    },
+  },
 });
