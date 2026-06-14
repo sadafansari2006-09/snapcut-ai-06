@@ -181,8 +181,8 @@ export function UploadDemo() {
     setPhase("processing");
     setProgress(5);
 
-    let progressInterval: ReturnType<typeof setInterval> | undefined;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let progressInterval: number | undefined;
+    let timeoutId: number | undefined;
     const controller = new AbortController();
 
     try {
@@ -326,7 +326,7 @@ export function UploadDemo() {
 
   return (
     <div className="glass rounded-2xl p-6 shadow-glow">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "upload" | "history") }>
         <TabsList className="mb-6">
           <TabsTrigger value="upload">Upload</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>

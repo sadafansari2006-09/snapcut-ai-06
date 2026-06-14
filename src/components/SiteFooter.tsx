@@ -1,4 +1,5 @@
 import logo from "@/assets/snapcut-logo.asset.json";
+import { Link } from "react-router-dom";
 
 export function SiteFooter() {
   return (
@@ -10,10 +11,13 @@ export function SiteFooter() {
             &copy; {new Date().getFullYear()} SnapCut AI &middot; Remove backgrounds in one click
           </span>
         </div>
-        <div className="flex gap-6 text-sm text-muted-foreground">
-          <a href="#" className="hover:text-foreground">Privacy</a>
-          <a href="#" className="hover:text-foreground">Terms</a>
-          <a href="#" className="hover:text-foreground">Contact</a>
+        <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground sm:justify-end">
+          <Link to="/website-link" className="hover:text-foreground">Website</Link>
+          <Link to="/privacy-policy" className="hover:text-foreground">Privacy</Link>
+          <Link to="/terms-and-conditions" className="hover:text-foreground">Terms</Link>
+          <Link to="/refund-policy" className="hover:text-foreground">Refund</Link>
+          <Link to="/shipping-delivery" className="hover:text-foreground">Shipping</Link>
+          <Link to="/contact-us" className="hover:text-foreground">Contact</Link>
         </div>
       </div>
     </footer>
