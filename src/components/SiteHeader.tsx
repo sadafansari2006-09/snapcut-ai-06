@@ -1,6 +1,8 @@
 import logo from "@/assets/snapcut-logo.asset.json";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { User, LogOut } from "lucide-react";
 
 const sectionLinks = [
   { label: "Features", hash: "#features" },
@@ -11,6 +13,7 @@ const sectionLinks = [
 
 export function SiteHeader() {
   const { pathname } = useLocation();
+  const { user, logout } = useAuth();
 
   const handleSectionClick = (hash: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (pathname === "/") {
@@ -50,10 +53,34 @@ export function SiteHeader() {
             <Link to="/contact-us" className="hover:text-foreground transition-colors">Contact</Link>
           </nav>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="hidden sm:inline-flex">Sign in</Button>
-            <Button asChild variant="hero" size="sm">
-              <Link to="/dashboard">Get started</Link>
-            </Button>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{user.email}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={logout}
+                  className="hidden sm:inline-flex gap-1"
+                >
+                  <LogOut className="h-4 w-4" /> Logout
+                </Button>
+                <Button asChild variant="hero" size="sm">
+                  <Link to="/dashboard">Dashboard</Link>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+                  <Link to="/login">Sign in</Link>
+                </Button>
+                <Button asChild variant="hero" size="sm">
+                  <Link to="/signup">Get started</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
