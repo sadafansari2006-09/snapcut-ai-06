@@ -1,41 +1,39 @@
-import jwt from 'jsonwebtoken';
+import { supabase } from './supabase';
 
-export interface DecodedJWT {
-  userId: string;
+export interface User {
+  id: string;
   email: string;
-  iat: number;
-  exp: number;
+  name: string | null;
+  plan: 'FREE' | 'PRO' | 'BUSINESS';
+  createdAt: string;
+  updatedAt: string;
 }
 
-export function verifyToken(token: string): DecodedJWT | null {
-  try {
-    const decoded = jwt.verify(
-      token,
-      import.meta.env.VITE_JWT_SECRET || import.meta.env.JWT_SECRET || 'your-super-secret-jwt-key-keep-it-safe-change-in-production'
-    ) as DecodedJWT;
-    return decoded;
-  } catch (error) {
-    return null;
+// Helper to sync Supabase user with our Prisma DB
+async function syncUserToDatabase(
+  userId: string,
+  email: string,
+  name?: string
+): Promise<User> {
+  const response = await fetch('/api/auth/sync-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: userId, email, name }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to sync user');
   }
-}
-
-export function getAuthToken(): string | null {
-  return localStorage.getItem('snapcut_auth_token');
-}
-
-export function setAuthToken(token: string): void {
-  localStorage.setItem('snapcut_auth_token', token);
-}
-
-export function removeAuthToken(): void {
-  localStorage.removeItem('snapcut_auth_token');
+  return data.user;
 }
 
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getAuthToken();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

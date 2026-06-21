@@ -1,83 +1,137 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getAuthToken, setAuthToken, removeAuthToken, verifyToken, apiRequest } from '../lib/auth';
-
-interface User {
-  id: string;
-  email: string;
-  name: string | null;
-  plan: 'FREE' | 'PRO' | 'BUSINESS';
-  createdAt: string;
-  updatedAt: string;
-}
+import { supabase } from '../lib/supabase';
+import type { User } from '../lib/auth';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+async function syncUserToDatabase(
+  userId: string,
+  email: string,
+  name?: string
+): Promise<User> {
+  const response = await fetch('/api/auth/sync-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: userId, email, name }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to sync user');
+  }
+  return data.user;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getAuthToken();
-    if (token) {
-      const decoded = verifyToken(token);
-      if (decoded) {
-        // For now, we'll set a mock user. In a real app, you'd fetch the user from the API
-        setUser({
-          id: decoded.userId,
-          email: decoded.email,
-          name: null,
-          plan: 'FREE',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+    // Check initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        try {
+          const prismaUser = await syncUserToDatabase(
+            session.user.id,
+            session.user.email!,
+            session.user.user_metadata?.full_name || session.user.user_metadata?.name
+          );
+          setUser(prismaUser);
+        } catch (error) {
+          console.error('Error syncing user:', error);
+        }
       }
-    }
-    setLoading(false);
+      
+      setLoading(false);
+    };
+
+    getInitialSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session?.user) {
+          try {
+            const prismaUser = await syncUserToDatabase(
+              session.user.id,
+              session.user.email!,
+              session.user.user_metadata?.full_name || session.user.user_metadata?.name
+            );
+            setUser(prismaUser);
+          } catch (error) {
+            console.error('Error syncing user:', error);
+          }
+        } else {
+          setUser(null);
+        }
+        
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await apiRequest<{
-      success: boolean;
-      token: string;
-      user: User;
-    }>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
-
-    if (response.success) {
-      setAuthToken(response.token);
-      setUser(response.user);
+    
+    if (error) {
+      toast.error(error.message);
+      throw error;
     }
+    
+    toast.success('Logged in successfully');
   };
 
   const signup = async (email: string, password: string, name?: string) => {
-    const response = await apiRequest<{
-      success: boolean;
-      token: string;
-      user: User;
-    }>('/api/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, name }),
+    const { error, data } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        },
+      },
     });
-
-    if (response.success) {
-      setAuthToken(response.token);
-      setUser(response.user);
+    
+    if (error) {
+      toast.error(error.message);
+      throw error;
     }
+    
+    // If user is returned, sync immediately
+    if (data.user) {
+      const prismaUser = await syncUserToDatabase(
+        data.user.id,
+        data.user.email!,
+        name
+      );
+      setUser(prismaUser);
+    }
+    
+    toast.success('Signed up successfully');
   };
 
-  const logout = () => {
-    removeAuthToken();
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    toast.success('Logged out successfully');
   };
 
   return (

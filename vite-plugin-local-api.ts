@@ -3,8 +3,6 @@ import { loadEnv } from 'vite';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
@@ -12,20 +10,14 @@ export default function localApiPlugin(): Plugin {
   return {
     name: 'vite-plugin-local-api',
     configureServer(server: ViteDevServer) {
-      console.log("[vite-plugin-local-api] Configuring server...");
+      console.log('[vite-plugin-local-api] Configuring server...');
       const env = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), '');
       
-      console.log("[vite-plugin-local-api] Loading environment variables...");
-      console.log("[vite-plugin-local-api] env.VITE_RAZORPAY_KEY_ID exists?", !!env.VITE_RAZORPAY_KEY_ID);
-      console.log("[vite-plugin-local-api] env.RAZORPAY_KEY_SECRET exists?", !!env.RAZORPAY_KEY_SECRET);
-      console.log("[vite-plugin-local-api] env.VITE_RAZORPAY_KEY_ID:", env.VITE_RAZORPAY_KEY_ID);
-      console.log("[vite-plugin-local-api] env.RAZORPAY_KEY_SECRET (length):", env.RAZORPAY_KEY_SECRET?.length);
-      console.log("[vite-plugin-local-api] env.JWT_SECRET exists?", !!env.JWT_SECRET);
+      console.log('[vite-plugin-local-api] Loading environment variables...');
 
-      // Auth Signup Endpoint
-      server.middlewares.use('/api/auth/signup', async (req, res) => {
-        console.log('[/api/auth/signup] === REQUEST RECEIVED ===');
-        console.log('[/api/auth/signup] Method:', req.method);
+      // Auth: Sync user endpoint
+      server.middlewares.use('/api/auth/sync-user', async (req, res) => {
+        console.log('[vite-plugin-local-api] /api/auth/sync-user request received');
 
         if (req.method !== 'POST') {
           res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -37,97 +29,25 @@ export default function localApiPlugin(): Plugin {
           for await (const chunk of req) {
             body += chunk;
           }
-          const { email, password, name } = JSON.parse(body);
+          const { id, email, name } = JSON.parse(body);
 
-          if (!email || !password) {
+          if (!id || !email) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ success: false, error: 'Email and password are required' }));
+            return res.end(JSON.stringify({ success: false, error: 'ID and email are required' }));
           }
 
-          const existingUser = await prisma.user.findUnique({ where: { email } });
-          if (existingUser) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ success: false, error: 'User already exists with this email' }));
+          let user = await prisma.user.findUnique({ where: { id } });
+          
+          if (user) {
+            user = await prisma.user.update({ where: { id }, data: { name } });
+          } else {
+            user = await prisma.user.create({ data: { id, email, name: name || null } });
           }
-
-          const hashedPassword = await bcrypt.hash(password, 10);
-          const user = await prisma.user.create({
-            data: { email, password: hashedPassword, name: name || null },
-          });
-
-          const token = jwt.sign(
-            { userId: user.id, email: user.email },
-            env.JWT_SECRET || 'your-super-secret-jwt-key-keep-it-safe-change-in-production',
-            { expiresIn: '30d' }
-          );
-
-          const { password: _, ...userWithoutPassword } = user;
-
-          res.writeHead(201, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({
-            success: true,
-            message: 'User created successfully',
-            token,
-            user: userWithoutPassword,
-          }));
-        } catch (error) {
-          console.error('[/api/auth/signup] Error:', error);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ success: false, error: 'Internal server error' }));
-        }
-      });
-
-      // Auth Login Endpoint
-      server.middlewares.use('/api/auth/login', async (req, res) => {
-        console.log('[/api/auth/login] === REQUEST RECEIVED ===');
-        console.log('[/api/auth/login] Method:', req.method);
-
-        if (req.method !== 'POST') {
-          res.writeHead(405, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ success: false, error: 'Method not allowed' }));
-        }
-
-        try {
-          let body = '';
-          for await (const chunk of req) {
-            body += chunk;
-          }
-          const { email, password } = JSON.parse(body);
-
-          if (!email || !password) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ success: false, error: 'Email and password are required' }));
-          }
-
-          const user = await prisma.user.findUnique({ where: { email } });
-          if (!user) {
-            res.writeHead(401, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ success: false, error: 'Invalid credentials' }));
-          }
-
-          const isPasswordValid = await bcrypt.compare(password, user.password);
-          if (!isPasswordValid) {
-            res.writeHead(401, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ success: false, error: 'Invalid credentials' }));
-          }
-
-          const token = jwt.sign(
-            { userId: user.id, email: user.email },
-            env.JWT_SECRET || 'your-super-secret-jwt-key-keep-it-safe-change-in-production',
-            { expiresIn: '30d' }
-          );
-
-          const { password: _, ...userWithoutPassword } = user;
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({
-            success: true,
-            message: 'Logged in successfully',
-            token,
-            user: userWithoutPassword,
-          }));
+          return res.end(JSON.stringify({ success: true, user }));
         } catch (error) {
-          console.error('[/api/auth/login] Error:', error);
+          console.error('[vite-plugin-local-api] /api/auth/sync-user error:', error);
           res.writeHead(500, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ success: false, error: 'Internal server error' }));
         }

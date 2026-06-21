@@ -19,9 +19,8 @@ enum UserPlan {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String   @id // Will store Supabase user ID
   email     String   @unique
-  password  String
   name      String?
   plan      UserPlan @default(FREE)
   createdAt DateTime @default(now())
